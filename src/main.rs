@@ -186,6 +186,8 @@ fn rename(password: &str) {
     let secret = secrets.remove(&update_key).unwrap();
     secrets.insert(new_key, secret);
 
+    write_secrets(password, secrets);
+
     println!("\n{}\n", "Success!".green())
 }
 
@@ -247,7 +249,7 @@ fn change_password(password: &str) {
 
 fn backup(password: &str) {
     let mut confirm = String::new();
-    print!("Are you sure you want to overwrite backup? [y/N] ");
+    print!("\nAre you sure you want to overwrite backup? [y/N] ");
     std::io::stdout().flush().unwrap();
     std::io::stdin().read_line(&mut confirm).unwrap();
     let confirm = confirm.trim().to_string();
@@ -262,7 +264,7 @@ fn backup(password: &str) {
 
 fn restore_from_backup(password: &str) {
     let mut confirm = String::new();
-    print!("Are you sure you want to overwrite secrets? [y/N] ");
+    print!("\nAre you sure you want to overwrite secrets? [y/N] ");
     std::io::stdout().flush().unwrap();
     std::io::stdin().read_line(&mut confirm).unwrap();
     let confirm = confirm.trim().to_string();
