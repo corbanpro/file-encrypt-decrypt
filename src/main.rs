@@ -33,12 +33,7 @@ fn main() {
     let password = init_res.unwrap();
 
     loop {
-        // get action input
-        let mut action = String::new();
-        print!("Action: ");
-        std::io::stdout().flush().unwrap();
-        std::io::stdin().read_line(&mut action).unwrap();
-        let action = action.trim().to_string();
+        let action = input("Action: ");
 
         // match action input
         match action.as_str() {
@@ -85,11 +80,7 @@ fn search_secrets(password: &str) {
     let mut secrets = get_secrets(password).unwrap();
 
     // get filter string
-    let mut grep_string = String::new();
-    print!("\nSearch: ");
-    std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut grep_string).unwrap();
-    let grep_string = grep_string.trim().to_string();
+    let grep_string = input("\nSearch: ");
 
     // filter list based on string
     secrets.retain(|key, _value| key.to_uppercase().contains(&grep_string.to_uppercase()));
@@ -103,11 +94,7 @@ fn search_secrets(password: &str) {
     print_keys(&secrets);
 
     // show secrets if they want to
-    let mut show_secrets = String::new();
-    print!("Show secrets? [y/N] ");
-    std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut show_secrets).unwrap();
-    let show_secrets = show_secrets.trim().to_string();
+    let show_secrets = input("Show secrets? [y/N] ");
 
     if show_secrets == "y" || show_secrets == "Y" {
         print_secrets(&secrets)
@@ -128,12 +115,8 @@ fn copy_to_clipboard(password: &str) {
         return;
     }
     let keys = print_keys(&secrets);
-    let mut secret_number = String::new();
-    print!("Secret to copy: [1-{}] ", keys.len());
-    std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut secret_number).unwrap();
-    let secret_number = secret_number.trim().to_string();
 
+    let secret_number = input(&format!("Secret to copy: [1-{}] ", keys.len()));
     let copy_key = keys.get(&secret_number);
     // return if invalid key
     if copy_key.is_none() {
@@ -159,11 +142,7 @@ fn copy_to_clipboard(password: &str) {
 fn add(password: &str) {
     // get new secret info
     println!();
-    let mut secret_id = String::new();
-    print!("Secret id: ");
-    std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut secret_id).unwrap();
-    let secret_id = secret_id.trim().to_string();
+    let secret_id = input("Secret id: ");
 
     print!("Secret: ");
     std::io::stdout().flush().unwrap();
@@ -184,11 +163,7 @@ fn update(password: &str) {
         return;
     }
     let keys = print_keys(&secrets);
-    let mut secret_number = String::new();
-    print!("Secret to update: [1-{}] ", keys.len());
-    std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut secret_number).unwrap();
-    let secret_number = secret_number.trim().to_string();
+    let secret_number = input(&format!("Secret to update: [1-{}] ", keys.len()));
 
     let update_key = keys.get(&secret_number);
     // return if invalid key
@@ -223,11 +198,8 @@ fn rename(password: &str) {
         return;
     }
     let keys = print_keys(&secrets);
-    let mut secret_number = String::new();
-    print!("Key to rename: [1-{}] ", keys.len());
-    std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut secret_number).unwrap();
-    let secret_number = secret_number.trim().to_string();
+
+    let secret_number = input(&format!("Key to rename: [1-{}] ", keys.len()));
 
     let rename_key = keys.get(&secret_number);
 
@@ -244,11 +216,7 @@ fn rename(password: &str) {
         return;
     }
 
-    let mut new_key = String::new();
-    print!("New key name: ");
-    std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut new_key).unwrap();
-    let new_key = new_key.trim().to_string();
+    let new_key = input("New key name: ");
 
     let secret = secrets.remove(rename_key).unwrap();
     secrets.insert(new_key, secret);
@@ -268,11 +236,7 @@ fn delete(password: &str) {
 
     // get delete key
 
-    let mut secret_number = String::new();
-    print!("Secret to delete: [1-{}] ", keys.len());
-    std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut secret_number).unwrap();
-    let secret_number = secret_number.trim().to_string();
+    let secret_number = input(&format!("Secret to delete: [1-{}] ", keys.len()));
 
     let delete_key = keys.get(&secret_number);
     // return if invalid key
@@ -289,11 +253,11 @@ fn delete(password: &str) {
     }
 
     // confirm and delete
-    let mut confirm = String::new();
-    print!("Are you sure you want to delete \"{}\"? [y/N] ", delete_key);
-    std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut confirm).unwrap();
-    let confirm = confirm.trim().to_string();
+    let confirm = input(&format!(
+        "Are you sure you want to delete \"{}\"? [y/N] ",
+        delete_key
+    ));
+
     if confirm == "y" || confirm == "Y" {
         secrets.remove(delete_key);
         println!("\n{}\n", "Success!".green());
@@ -327,11 +291,8 @@ fn change_password(password: &str) {
 }
 
 fn backup(password: &str) {
-    let mut confirm = String::new();
-    print!("\nAre you sure you want to overwrite backup? [y/N] ");
-    std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut confirm).unwrap();
-    let confirm = confirm.trim().to_string();
+    let confirm = input("\nAre you sure you want to overwrite backup? [y/N] ");
+
     if confirm == "y" || confirm == "Y" {
         let secrets = get_secrets(password).unwrap();
         write_backup_secrets(password, secrets);
@@ -342,11 +303,8 @@ fn backup(password: &str) {
 }
 
 fn restore_from_backup(password: &str) {
-    let mut confirm = String::new();
-    print!("\nAre you sure you want to overwrite secrets? [y/N] ");
-    std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut confirm).unwrap();
-    let confirm = confirm.trim().to_string();
+    let confirm = input("\nAre you sure you want to overwrite secrets? [y/N] ");
+
     if confirm == "y" || confirm == "Y" {
         let secrets = get_backup_secrets(password).unwrap();
         write_secrets(password, secrets);
@@ -494,4 +452,13 @@ fn init() -> Result<String, String> {
     println!("\n{}\n", "Secrets file created".green());
 
     Ok(password)
+}
+
+fn input(prompt: &str) -> String {
+    let mut input = String::new();
+    print!("{prompt}");
+    std::io::stdout().flush().unwrap();
+    std::io::stdin().read_line(&mut input).unwrap();
+    let input = input.trim().to_string();
+    input
 }
