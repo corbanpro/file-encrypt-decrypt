@@ -1,3 +1,4 @@
+use arboard::Clipboard;
 use colored::Colorize;
 use rpassword::read_password;
 use serde::{Deserialize, Serialize};
@@ -34,7 +35,7 @@ fn main() {
     loop {
         // get action input
         let mut action = String::new();
-        print!("Action [? for help]: ");
+        print!("Action: ");
         std::io::stdout().flush().unwrap();
         std::io::stdin().read_line(&mut action).unwrap();
         let action = action.trim().to_string();
@@ -42,6 +43,7 @@ fn main() {
         // match action input
         match action.as_str() {
             "r" => read(&password),
+            "c" => copy_to_clipboard(&password),
             "s" => grep_secrets(&password),
             "a" => add(&password),
             "u" => update(&password),
@@ -57,9 +59,9 @@ fn main() {
             "Q" | "q" => {
                 break;
             }
-            "?" => {
+            "?" | "h" | "H" | "help" => {
                 println!(
-                    "\n{}\n[r] Read secrets\n[s] Search secrets\n[a] Add new secret\n[u] Update secret\n[rn] Rename secret\n[d] Delete secret\n[p] Change password\n[b] Backup secrets\n[rs] Restore secrets from backup\n[q] Quit\n",
+                    "\n{}\n[r] Read plaintext secrets\n[c] Copy secret to clipboard\n[s] Search secrets\n[a] Add new secret\n[u] Update secret\n[rn] Rename secret\n[d] Delete secret\n[p] Change password\n[b] Backup secrets\n[rs] Restore secrets from backup\n[q] Quit\n",
                     "Actions:".cyan()
                 );
                 continue;
@@ -76,6 +78,41 @@ fn main() {
 fn read(password: &str) {
     let secrets = get_secrets(password).unwrap();
     print_secrets(&secrets)
+}
+
+fn copy_to_clipboard(password: &str) {
+    let secrets = get_secrets(password).unwrap();
+    if secrets.is_empty() {
+        println!("\nNo keys to update\n");
+        return;
+    }
+    let keys = print_keys(&secrets);
+    let mut secret_number = String::new();
+    print!("Secret to copy: [1-{}] ", keys.len());
+    std::io::stdout().flush().unwrap();
+    std::io::stdin().read_line(&mut secret_number).unwrap();
+    let secret_number = secret_number.trim().to_string();
+
+    let copy_key = keys.get(&secret_number);
+    // return if invalid key
+    if copy_key.is_none() {
+        println!("{}", "\nInvalid number\n".red());
+        return;
+    }
+
+    let copy_key = copy_key.unwrap();
+
+    let secret = secrets.get(copy_key);
+
+    if secret.is_none() {
+        println!("\n{}\n", "Invalid key".red())
+    }
+
+    let secret = secret.unwrap();
+    let mut clipboard = Clipboard::new().unwrap();
+
+    clipboard.set_text(secret).unwrap();
+    println!("\n{}\n", "Copied to clipboard!".green())
 }
 
 fn grep_secrets(password: &str) {
@@ -136,16 +173,29 @@ fn add(password: &str) {
 fn update(password: &str) {
     // get secret id
     let mut secrets = get_secrets(password).unwrap();
-    print_keys(&secrets);
-    let mut secret_id = String::new();
-    print!("Secret id: ");
+    if secrets.is_empty() {
+        println!("\nNo keys to update\n");
+        return;
+    }
+    let keys = print_keys(&secrets);
+    let mut secret_number = String::new();
+    print!("Secret to update: [1-{}] ", keys.len());
     std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut secret_id).unwrap();
-    let secret_id = secret_id.trim().to_string();
+    std::io::stdin().read_line(&mut secret_number).unwrap();
+    let secret_number = secret_number.trim().to_string();
+
+    let update_key = keys.get(&secret_number);
+    // return if invalid key
+    if update_key.is_none() {
+        println!("{}", "\nInvalid number\n".red());
+        return;
+    }
+
+    let update_key = update_key.unwrap();
 
     // return if invalid key
-    if !secrets.contains_key(&secret_id) {
-        println!("{}", "\nInvalid id\n".red());
+    if !secrets.contains_key(update_key) {
+        println!("{}", "\nInvalid key\n".red());
         return;
     }
 
@@ -154,25 +204,36 @@ fn update(password: &str) {
     let secret = read_password().unwrap();
 
     // update secret
-    secrets.insert(secret_id, secret);
+    secrets.insert(update_key.to_string(), secret);
     write_secrets(password, secrets);
     println!("\n{}\n", "Success!".green());
 }
 
 fn rename(password: &str) {
-    let secrets = get_secrets(password).unwrap();
-    print_keys(&secrets);
-
-    // get delete key
-    let mut update_key = String::new();
-    print!("Key to rename: ");
-    std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut update_key).unwrap();
-    let update_key = update_key.trim().to_string();
-
     let mut secrets = get_secrets(password).unwrap();
 
-    if !secrets.contains_key(&update_key) {
+    if secrets.is_empty() {
+        println!("\nNo keys to update\n");
+        return;
+    }
+    let keys = print_keys(&secrets);
+    let mut secret_number = String::new();
+    print!("Key to rename: [1-{}] ", keys.len());
+    std::io::stdout().flush().unwrap();
+    std::io::stdin().read_line(&mut secret_number).unwrap();
+    let secret_number = secret_number.trim().to_string();
+
+    let rename_key = keys.get(&secret_number);
+
+    // return if invalid key
+    if rename_key.is_none() {
+        println!("{}", "\nInvalid number\n".red());
+        return;
+    }
+
+    let rename_key = rename_key.unwrap();
+
+    if !secrets.contains_key(rename_key) {
         println!("\n{}\n", "Invalid key".red());
         return;
     }
@@ -183,7 +244,7 @@ fn rename(password: &str) {
     std::io::stdin().read_line(&mut new_key).unwrap();
     let new_key = new_key.trim().to_string();
 
-    let secret = secrets.remove(&update_key).unwrap();
+    let secret = secrets.remove(rename_key).unwrap();
     secrets.insert(new_key, secret);
 
     write_secrets(password, secrets);
@@ -192,19 +253,31 @@ fn rename(password: &str) {
 }
 
 fn delete(password: &str) {
-    let secrets = get_secrets(password).unwrap();
-    print_keys(&secrets);
+    let mut secrets = get_secrets(password).unwrap();
+    if secrets.is_empty() {
+        println!("\nNo keys to update\n");
+        return;
+    }
+    let keys = print_keys(&secrets);
 
     // get delete key
-    let mut delete_key = String::new();
-    print!("Key to delete: ");
+
+    let mut secret_number = String::new();
+    print!("Secret to delete: [1-{}] ", keys.len());
     std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut delete_key).unwrap();
-    let delete_key = delete_key.trim().to_string();
+    std::io::stdin().read_line(&mut secret_number).unwrap();
+    let secret_number = secret_number.trim().to_string();
 
-    let mut secrets = get_secrets(password).unwrap();
+    let delete_key = keys.get(&secret_number);
+    // return if invalid key
+    if delete_key.is_none() {
+        println!("{}", "\nInvalid number\n".red());
+        return;
+    }
 
-    if !secrets.contains_key(&delete_key) {
+    let delete_key = delete_key.unwrap();
+
+    if !secrets.contains_key(delete_key) {
         println!("\n{}\n", "Invalid key".red());
         return;
     }
@@ -216,7 +289,7 @@ fn delete(password: &str) {
     std::io::stdin().read_line(&mut confirm).unwrap();
     let confirm = confirm.trim().to_string();
     if confirm == "y" || confirm == "Y" {
-        secrets.remove(&delete_key);
+        secrets.remove(delete_key);
         println!("\n{}\n", "Success!".green());
         write_secrets(password, secrets)
     } else {
@@ -293,21 +366,27 @@ fn print_secrets(secrets: &HashMap<String, String>) {
     }
     println!();
 }
-fn print_keys(secrets: &HashMap<String, String>) {
+fn print_keys(secrets: &HashMap<String, String>) -> HashMap<String, String> {
     println!("\n{}", "Keys:".cyan());
+    let mut keys = HashMap::new();
+
     if secrets.is_empty() {
         println!("No keys found\n");
-        return;
+
+        return keys;
     }
 
     let mut secrets_vec: Vec<&String> = secrets.keys().collect();
 
     secrets_vec.sort();
 
-    for key in secrets_vec {
-        println!("{}", key);
+    for (index, key) in secrets_vec.iter().enumerate() {
+        let index = (index + 1).to_string();
+        println!("[{}] {}", index, key);
+        keys.insert(index, key.to_string());
     }
     println!();
+    keys
 }
 fn get_secrets(password: &str) -> Result<HashMap<String, String>, ()> {
     let cipher_secrets_buffer = fs::read(CIPHERTEXT_FILE_PATH).expect("Unable to read file");
