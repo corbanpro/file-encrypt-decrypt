@@ -43,8 +43,9 @@ fn main() {
         // match action input
         match action.as_str() {
             "r" => read(&password),
+            "s" => search_secrets(&password),
+            "k" => read_keys(&password),
             "c" => copy_to_clipboard(&password),
-            "s" => grep_secrets(&password),
             "a" => add(&password),
             "u" => update(&password),
             "rn" => rename(&password),
@@ -61,8 +62,8 @@ fn main() {
             }
             "?" | "h" | "H" | "help" => {
                 println!(
-                    "\n{}\n[r] Read plaintext secrets\n[c] Copy secret to clipboard\n[s] Search secrets\n[a] Add new secret\n[u] Update secret\n[rn] Rename secret\n[d] Delete secret\n[p] Change password\n[b] Backup secrets\n[rs] Restore secrets from backup\n[q] Quit\n",
-                    "Actions:".cyan()
+                    "\n{}\n{}\n{}\n[k] Show keys\n[c] Copy secret to clipboard\n[a] Add new secret\n[u] Update secret\n[rn] Rename secret\n[d] Delete secret\n[p] Change password\n[b] Backup secrets\n[rs] Restore secrets from backup\n[q] Quit\n",
+                    "Actions:".cyan(), "[r] Read plaintext secrets".red(), "[s] Search secrets".red()
                 );
                 continue;
             }
@@ -78,6 +79,46 @@ fn main() {
 fn read(password: &str) {
     let secrets = get_secrets(password).unwrap();
     print_secrets(&secrets)
+}
+
+fn search_secrets(password: &str) {
+    let mut secrets = get_secrets(password).unwrap();
+
+    // get filter string
+    let mut grep_string = String::new();
+    print!("\nSearch: ");
+    std::io::stdout().flush().unwrap();
+    std::io::stdin().read_line(&mut grep_string).unwrap();
+    let grep_string = grep_string.trim().to_string();
+
+    // filter list based on string
+    secrets.retain(|key, _value| key.to_uppercase().contains(&grep_string.to_uppercase()));
+
+    // return if there are no matches
+    if secrets.is_empty() {
+        println!("\n{}\n", "No matches".red());
+        return;
+    }
+
+    print_keys(&secrets);
+
+    // show secrets if they want to
+    let mut show_secrets = String::new();
+    print!("Show secrets? [y/N] ");
+    std::io::stdout().flush().unwrap();
+    std::io::stdin().read_line(&mut show_secrets).unwrap();
+    let show_secrets = show_secrets.trim().to_string();
+
+    if show_secrets == "y" || show_secrets == "Y" {
+        print_secrets(&secrets)
+    } else {
+        println!()
+    }
+}
+
+fn read_keys(password: &str) {
+    let secrets = get_secrets(password).unwrap();
+    print_keys(&secrets);
 }
 
 fn copy_to_clipboard(password: &str) {
@@ -113,41 +154,6 @@ fn copy_to_clipboard(password: &str) {
 
     clipboard.set_text(secret).unwrap();
     println!("\n{}\n", "Copied to clipboard!".green())
-}
-
-fn grep_secrets(password: &str) {
-    let mut secrets = get_secrets(password).unwrap();
-
-    // get filter string
-    let mut grep_string = String::new();
-    print!("\nSearch: ");
-    std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut grep_string).unwrap();
-    let grep_string = grep_string.trim().to_string();
-
-    // filter list based on string
-    secrets.retain(|key, _value| key.to_uppercase().contains(&grep_string.to_uppercase()));
-
-    // return if there are no matches
-    if secrets.is_empty() {
-        println!("\n{}\n", "No matches".red());
-        return;
-    }
-
-    print_keys(&secrets);
-
-    // show secrets if they want to
-    let mut show_secrets = String::new();
-    print!("Show secrets? [y/N] ");
-    std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut show_secrets).unwrap();
-    let show_secrets = show_secrets.trim().to_string();
-
-    if show_secrets == "y" || show_secrets == "Y" {
-        print_secrets(&secrets)
-    } else {
-        println!()
-    }
 }
 
 fn add(password: &str) {
@@ -284,7 +290,7 @@ fn delete(password: &str) {
 
     // confirm and delete
     let mut confirm = String::new();
-    print!("Are you sure? [y/N] ");
+    print!("Are you sure you want to delete \"{}\"? [y/N] ", delete_key);
     std::io::stdout().flush().unwrap();
     std::io::stdin().read_line(&mut confirm).unwrap();
     let confirm = confirm.trim().to_string();
