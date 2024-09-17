@@ -6,7 +6,8 @@ use serde_encrypt::serialize::impls::BincodeSerializer;
 use serde_encrypt::shared_key::SharedKey;
 use serde_encrypt::traits::SerdeEncryptSharedKey;
 use serde_encrypt::EncryptedMessage;
-use sha2::{Digest, Sha256};
+use sha2::Digest;
+use sha2::Sha256;
 use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
@@ -49,6 +50,7 @@ fn main() {
                 change_password(&password);
                 break;
             }
+            "cb" => compare_backup(&password),
             "b" => backup(&password),
             "rs" => restore_from_backup(&password),
 
@@ -57,8 +59,8 @@ fn main() {
             }
             "?" | "h" | "H" | "help" => {
                 println!(
-                    "\n{}\n{}\n{}\n[k] Show keys\n[c] Copy secret to clipboard\n[a] Add new secret\n[u] Update secret\n[rn] Rename secret\n[d] Delete secret\n[p] Change password\n[b] Backup secrets\n[rs] Restore secrets from backup\n[q] Quit\n",
-                    "Actions:".cyan(), "[r] Read plaintext secrets".red(), "[s] Search secrets".red()
+                    "\n{}\n{}\n{}\n[k] Show keys\n[c] Copy secret to clipboard\n[a] Add new secret\n[u] Update secret\n[rn] Rename secret\n[d] Delete secret\n[p] Change password\n{}\n[b] Backup secrets\n[rs] Restore secrets from backup\n[q] Quit\n",
+                    "Actions:".cyan(), "[r] Read plaintext secrets".red(), "[s] Search secrets".red(), "[cb] Compare backup diff".red()
                 );
                 continue;
             }
@@ -302,6 +304,30 @@ fn backup(password: &str) {
     }
 }
 
+fn compare_backup(password: &str) {
+    let secrets = get_secrets(password).unwrap();
+    let backup = get_backup_secrets(password).unwrap();
+
+    println!("\n{}", "Diff:".cyan());
+    for (key, secret) in backup.iter() {
+        if !secrets.contains_key(key) || secrets.get(key).unwrap() != secret {
+            println!("- {}", format!("{key}: {secret}").red());
+            if let Some(secret) = secrets.get(key) {
+                println!("+ {}", format!("{key}: {secret}").green());
+            }
+        } else {
+            println!("  {key}: {secret}");
+        }
+    }
+
+    for (key, secret) in secrets.iter() {
+        if !backup.contains_key(key) {
+            println!("+ {}", format!("{key}: {secret}").green());
+        }
+    }
+    println!();
+}
+
 fn restore_from_backup(password: &str) {
     let confirm = input("\nAre you sure you want to overwrite secrets? [y/N] ");
 
@@ -448,7 +474,8 @@ fn init() -> Result<String, String> {
     }
 
     let secrets = HashMap::new();
-    write_secrets(&password, secrets);
+    write_secrets(&password, secrets.clone());
+    write_backup_secrets(&password, secrets);
     println!("\n{}\n", "Secrets file created".green());
 
     Ok(password)
