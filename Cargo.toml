@@ -1,5 +1,5 @@
 [package]
-name = "secrets"
+name = "bitwarden_backup"
 version = "0.1.0"
 edition = "2021"
 
