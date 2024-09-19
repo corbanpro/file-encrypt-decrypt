@@ -70,19 +70,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b048fb63fd8b5923fc5aa7b340d8e156aec7ec02f0c78fa8a6ddc2613f6f71de"
 
 [[package]]
-name = "bitwarden_backup"
-version = "0.1.0"
-dependencies = [
- "arboard",
- "colored",
- "rpassword",
- "serde",
- "serde-encrypt",
- "serde_json",
- "sha2",
-]
-
-[[package]]
 name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -315,6 +302,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4f9bfee30e4dedf0ab8b422f03af778d9612b63f502710fc500a334ebe2de645"
 dependencies = [
  "simd-adler32",
+]
+
+[[package]]
+name = "file-encrypt-decrypt"
+version = "0.1.0"
+dependencies = [
+ "arboard",
+ "colored",
+ "rpassword",
+ "serde",
+ "serde-encrypt",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]

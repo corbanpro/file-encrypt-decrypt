@@ -1,4 +1,4 @@
 #!bin/bash
 
 cargo build
-sudo mv ./target/debug/bitwarden_backup /usr/local/bin/bwback
+sudo mv ./target/debug/file-encrypt-decrypt /usr/local/bin/enc

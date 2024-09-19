@@ -10,10 +10,6 @@ use sha2::Sha256;
 use std::fs;
 use std::io::Write;
 
-const CIPHERTEXT_FILE_PATH: &str = "/home/corba/.secrets/bitwarden_encrypted_secrets";
-const PLAINTEXT_WRITE_FILE_PATH: &str = "/home/corba/.secrets/bitwarden_dump_plaintext.json";
-const PLAINTEXT_READ_FILE_PATH: &str = "/home/corba/.secrets/bitwarden_dump_plaintext.json";
-
 #[derive(Serialize, Deserialize)]
 struct SecretsManager {
     secrets: String,
@@ -23,72 +19,92 @@ impl SerdeEncryptSharedKey for SecretsManager {
 }
 
 fn main() {
-    while let Some(arg) = std::env::args().nth(1) {
-        println!("{}", arg);
+    let action = std::env::args().nth(1);
+    if action.is_none() {
+        println!("\n{}\n", "Please use -e or -d flag".red());
+        return;
     }
-    // get password, create files if necessary
-    let init_res = init();
-    if let Err(err_msg) = init_res {
-        println!("\n{}\n", err_msg.red());
+
+    let action = action.unwrap();
+
+    if action != "-e" && action != "-d" {
+        println!("\n{}\n", "Please use -e or -d flag".red());
+        return;
+    }
+
+    if std::env::args().len() != 4 {
+        println!(
+            "\n{}\n",
+            "Please provide 3 arguments: (flag, read file, write file)".red()
+        );
+        return;
+    }
+    let read_file_path = std::env::args().nth(2).unwrap();
+    let write_file_path = std::env::args().nth(3).unwrap();
+
+    let read_file_res = std::fs::read(&read_file_path);
+
+    if read_file_res.is_err() {
+        println!("\n{}\n", "Problem opening read file".red());
         return;
     };
-    let password = init_res.unwrap();
 
-    // user event loop
-    loop {
-        let action = input("Action: ");
-
-        // match action input
-        match action.as_str() {
-            "d" => decrypt(&password),
-            "e" => encrypt(&password),
-            "Q" | "q" => {
-                break;
-            }
-            "?" | "h" | "H" | "help" => {
-                println!(
-                    "\n{}\n[e] encrypt\n[d] decrypt\n[q] quit\n[h] help\n",
-                    "Actions: ".cyan()
-                );
-                continue;
-            }
-            _ => {
-                println!("\n{}\n", "Invalid command".red());
-                continue;
-            }
+    // match action input
+    match action.as_str() {
+        "-d" => decrypt(&read_file_path, &write_file_path),
+        "-e" => encrypt(&read_file_path, &write_file_path),
+        _ => {
+            println!("\n{}\n", "Please use -e or -d flag".red());
         }
     }
 }
 
 // handlers
-fn encrypt(password: &str) {
+fn encrypt(plaintext_read_file_path: &str, ciphertext_write_file_path: &str) {
+    // get password
+    let password = get_password("Enter password: ");
+    let confirm_password = get_password("Confirm password: ");
+    if password != confirm_password {
+        println!("\n{}\n", "Passwords do not match".red());
+        return;
+    }
     // get plaintext secrets json
-    let plaintext_secrets: String = std::fs::read_to_string(PLAINTEXT_READ_FILE_PATH)
-        .unwrap_or_else(|_| {
-            let plaintext_path = input("Enter path to plaintext secrets file: ");
-            std::fs::read_to_string(&plaintext_path).expect("Unable to read file")
-        });
-
-    write_secrets(password, plaintext_secrets.clone());
+    let plaintext_secrets: String = std::fs::read_to_string(plaintext_read_file_path).unwrap();
+    write_secrets(
+        &password,
+        plaintext_secrets.clone(),
+        ciphertext_write_file_path,
+    );
     println!("\n{}\n", "Success!".green());
 }
 
-fn decrypt(password: &str) {
-    // get secrets buffer
-    let plaintext_path = std::env::args()
-        .nth(2)
-        .unwrap_or(PLAINTEXT_WRITE_FILE_PATH.to_string());
+fn decrypt(read_file_path: &str, write_file_path: &str) {
+    // get password
+    let password = get_password("Enter password: ");
 
-    let secrets = get_secrets(password).unwrap();
+    // get secrets
+    let secrets = match get_secrets(&password, read_file_path) {
+        Ok(secrets) => secrets,
+        Err(_) => {
+            println!("\n{}\n", "Incorrect password".red());
+            return;
+        }
+    };
 
-    fs::write(plaintext_path, secrets).expect("Unable to write file");
+    fs::write(write_file_path, secrets).expect("Unable to write file");
     println!("\n{}\n", "Success!".green());
 }
 
 // helpers
-fn get_secrets(password: &str) -> Result<String, ()> {
+fn get_password(prompt: &str) -> String {
+    print!("{prompt}");
+    std::io::stdout().flush().unwrap();
+    read_password().unwrap()
+}
+
+fn get_secrets(password: &str, ciphertext_read_file_path: &str) -> Result<String, ()> {
     // get secrets buffer
-    let cipher_secrets_buffer = fs::read(CIPHERTEXT_FILE_PATH).expect("Unable to read file");
+    let cipher_secrets_buffer = fs::read(ciphertext_read_file_path).expect("Unable to read file");
 
     // decrypt buffer
     let shared_key = SharedKey::new(password_to_key(password));
@@ -97,15 +113,12 @@ fn get_secrets(password: &str) -> Result<String, ()> {
 
     match msg {
         Ok(msg) => Ok(msg.secrets),
-        Err(e) => {
-            println!("{:?}", e);
-            Err(())
-        }
+        Err(_) => Err(()),
     }
 }
 
 // helpers
-fn write_secrets(password: &str, secrets: String) {
+fn write_secrets(password: &str, secrets: String, ciphertext_write_file_path: &str) {
     // encrypt secrets
     let shared_key = SharedKey::new(password_to_key(password));
     let msg = SecretsManager { secrets };
@@ -113,7 +126,8 @@ fn write_secrets(password: &str, secrets: String) {
     let serialized_encrypted_message: Vec<u8> = encrypted_message.serialize();
 
     // write out
-    fs::write(CIPHERTEXT_FILE_PATH, serialized_encrypted_message).expect("Unable to write file");
+    fs::write(ciphertext_write_file_path, serialized_encrypted_message)
+        .expect("Unable to write file");
 }
 
 fn password_to_key(password: &str) -> [u8; 32] {
@@ -131,50 +145,4 @@ fn password_to_key(password: &str) -> [u8; 32] {
     }
 
     result
-}
-
-fn init() -> Result<String, String> {
-    // check for secrets file
-    let secrets = fs::read(CIPHERTEXT_FILE_PATH);
-    if secrets.is_ok() {
-        // get password input
-        print!("Password: ");
-        std::io::stdout().flush().unwrap();
-        let password = read_password().unwrap();
-
-        // verify password
-        if get_secrets(&password).is_err() {
-            return Err("Incorrect password".to_string());
-        }
-
-        println!();
-        return Ok(password);
-    }
-    // initialize password manager
-    print!("\nWelcome to password manager\n\nSet a master password: ");
-    std::io::stdout().flush().unwrap();
-    let password = read_password().unwrap();
-    print!("Confirm master password: ");
-    std::io::stdout().flush().unwrap();
-    let confirm_password = read_password().unwrap();
-    if password != confirm_password {
-        return Err("Passwords don't match".to_string());
-    }
-
-    // create secret and backup files
-    let secrets = "{}".to_string();
-    write_secrets(&password, secrets);
-
-    println!("\n{}\n", "Secrets file created".green());
-
-    Ok(password)
-}
-
-fn input(prompt: &str) -> String {
-    // get input
-    let mut input = String::new();
-    print!("{prompt}");
-    std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut input).unwrap();
-    input.trim().to_string()
 }

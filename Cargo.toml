@@ -1,5 +1,5 @@
 [package]
-name = "bitwarden_backup"
+name = "file-encrypt-decrypt"
 version = "0.1.0"
 edition = "2021"
 
