@@ -1,3 +1,4 @@
+use clap::Parser;
 use colored::Colorize;
 use rpassword::read_password;
 use serde::{Deserialize, Serialize};
@@ -10,6 +11,26 @@ use sha2::Sha256;
 use std::fs;
 use std::io::Write;
 
+/// A simple program to demonstrate flags in a Rust CLI program
+#[derive(Parser, Debug)]
+#[command(name = "enc")]
+#[command(author = "Corban Procuniar <corbanpro@gmail.com>")]
+#[command(version = "1.0")]
+#[command(about = "encrypt and decrypt files", long_about = None)]
+struct Args {
+    #[arg(short, long)]
+    encrypt: bool,
+
+    #[arg(short, long)]
+    decrypt: bool,
+
+    #[arg(value_name = "READ FILE")]
+    read_file: String,
+
+    #[arg(value_name = "WRITE FILE")]
+    write_file: Option<String>,
+}
+
 #[derive(Serialize, Deserialize)]
 struct SecretsManager {
     secrets: String,
@@ -19,44 +40,21 @@ impl SerdeEncryptSharedKey for SecretsManager {
 }
 
 fn main() {
-    let action = std::env::args().nth(1);
-    if action.is_none() {
-        println!("\n{}\n", "Please use -e or -d flag".red());
-        return;
-    }
+    let args = Args::parse();
 
-    let action = action.unwrap();
+    let read_file_path = &args.read_file;
+    let write_file_path = &args.write_file.unwrap_or(format!("{}.enc", args.read_file));
 
-    if action != "-e" && action != "-d" {
-        println!("\n{}\n", "Please use -e or -d flag".red());
-        return;
-    }
-
-    if std::env::args().len() != 4 {
-        println!(
-            "\n{}\n",
-            "Please provide 3 arguments: (flag, read file, write file)".red()
-        );
-        return;
-    }
-    let read_file_path = std::env::args().nth(2).unwrap();
-    let write_file_path = std::env::args().nth(3).unwrap();
-
-    let read_file_res = std::fs::read(&read_file_path);
+    let read_file_res = std::fs::read(read_file_path);
 
     if read_file_res.is_err() {
         println!("\n{}\n", "Problem opening read file".red());
         return;
     };
 
-    // match action input
-    match action.as_str() {
-        "-d" => decrypt(&read_file_path, &write_file_path),
-        "-e" => encrypt(&read_file_path, &write_file_path),
-        _ => {
-            println!("\n{}\n", "Please use -e or -d flag".red());
-        }
-    }
+    let func = if args.decrypt { decrypt } else { encrypt };
+
+    func(read_file_path, write_file_path);
 }
 
 // handlers
@@ -70,12 +68,12 @@ fn encrypt(plaintext_read_file_path: &str, ciphertext_write_file_path: &str) {
     }
     // get plaintext secrets json
     let plaintext_secrets: String = std::fs::read_to_string(plaintext_read_file_path).unwrap();
-    write_secrets(
-        &password,
-        plaintext_secrets.clone(),
-        ciphertext_write_file_path,
+    write_secrets(&password, plaintext_secrets.clone(), ciphertext_write_file_path);
+    println!(
+        "\n{}\n\nSet restrictive permissions on encrypted file to prevent corruption. Run:\n\n{}\n",
+        "Success!".green(),
+        format!("sudo chmod 400 {}", ciphertext_write_file_path).yellow()
     );
-    println!("\n{}\n", "Success!".green());
 }
 
 fn decrypt(read_file_path: &str, write_file_path: &str) {
@@ -126,8 +124,7 @@ fn write_secrets(password: &str, secrets: String, ciphertext_write_file_path: &s
     let serialized_encrypted_message: Vec<u8> = encrypted_message.serialize();
 
     // write out
-    fs::write(ciphertext_write_file_path, serialized_encrypted_message)
-        .expect("Unable to write file");
+    fs::write(ciphertext_write_file_path, serialized_encrypted_message).expect("Unable to write file");
 }
 
 fn password_to_key(password: &str) -> [u8; 32] {
