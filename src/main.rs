@@ -11,7 +11,6 @@ use sha2::Sha256;
 use std::fs;
 use std::io::Write;
 
-/// A simple program to demonstrate flags in a Rust CLI program
 #[derive(Parser, Debug)]
 #[command(name = "enc")]
 #[command(author = "Corban Procuniar <corbanpro@gmail.com>")]
