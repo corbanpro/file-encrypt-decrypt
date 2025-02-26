@@ -42,7 +42,10 @@ fn main() {
     let args = Args::parse();
 
     let read_file_path = &args.read_file;
-    let write_file_path = &args.write_file.unwrap_or(format!("{}.enc", args.read_file));
+
+    let write_file_path = &args
+        .write_file
+        .unwrap_or(format_write_file(read_file_path, args.encrypt));
 
     let read_file_res = std::fs::read(read_file_path);
 
@@ -141,4 +144,17 @@ fn password_to_key(password: &str) -> [u8; 32] {
     }
 
     result
+}
+
+fn format_write_file(read_file_path: &str, encrypting: bool) -> String {
+    match encrypting {
+        true => format!("{read_file_path}.enc").to_string(),
+        false => {
+            if read_file_path.ends_with(".enc") {
+                read_file_path.strip_suffix(".enc").unwrap().to_string()
+            } else {
+                format!("{read_file_path}.plaintext").to_string()
+            }
+        }
+    }
 }
