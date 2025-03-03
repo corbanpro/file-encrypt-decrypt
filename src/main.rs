@@ -10,6 +10,7 @@ use sha2::Digest;
 use sha2::Sha256;
 use std::fs;
 use std::io::Write;
+use std::os::unix::fs::PermissionsExt;
 
 #[derive(Parser, Debug)]
 #[command(name = "enc")]
@@ -17,9 +18,6 @@ use std::io::Write;
 #[command(version = "1.0")]
 #[command(about = "encrypt and decrypt files", long_about = None)]
 struct Args {
-    #[arg(short, long)]
-    encrypt: bool,
-
     #[arg(short, long)]
     decrypt: bool,
 
@@ -45,7 +43,7 @@ fn main() {
 
     let write_file_path = &args
         .write_file
-        .unwrap_or(format_write_file(read_file_path, args.encrypt));
+        .unwrap_or(format_write_file(read_file_path, !args.decrypt));
 
     let read_file_res = std::fs::read(read_file_path);
 
@@ -71,11 +69,13 @@ fn encrypt(plaintext_read_file_path: &str, ciphertext_write_file_path: &str) {
     // get plaintext secrets json
     let plaintext_secrets: String = std::fs::read_to_string(plaintext_read_file_path).unwrap();
     write_secrets(&password, plaintext_secrets.clone(), ciphertext_write_file_path);
-    println!(
-        "\n{}\n\nSet restrictive permissions on encrypted file to prevent corruption. Run:\n\n{}\n",
-        "Success!".green(),
-        format!("sudo chmod 400 {}", ciphertext_write_file_path).yellow()
-    );
+
+    // set file permissions
+    let mut perms = fs::metadata(ciphertext_write_file_path).unwrap().permissions();
+    perms.set_mode(0o400);
+    fs::set_permissions(ciphertext_write_file_path, perms).unwrap();
+
+    println!("\n{}\n", "Success!".green(),);
 }
 
 fn decrypt(read_file_path: &str, write_file_path: &str) {
